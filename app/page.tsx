@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import styles from './page.module.css';
 import type { FeedItem } from './types';
 import EmailPreview from './components/EmailPreview';
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabType>('unprocessed');
   const [filter, setFilter] = useState<FilterType>('all');
   const [newItems, setNewItems] = useState<Set<string>>(new Set());
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const getFaviconUrl = (url: string) => {
     return `https://www.google.com/s2/favicons?domain=${url}&sz=32`;
@@ -60,16 +61,19 @@ export default function DashboardPage() {
   const unprocessedFeeds = feeds.filter(feed => !feed.processed);
   const processedFeeds = feeds.filter(feed => feed.processed);
 
-  const handleEmailProcessed = (processedEmail: FeedItem) => {
-    setFeeds(currentFeeds => 
-      currentFeeds.map(feed => 
-        feed.id === processedEmail.id 
-          ? { ...feed, processed: true } 
-          : feed
-      )
-    );
-    setSelectedEmail(null);
-  };
+  const handleEmailProcessed = useCallback((processedEmail: FeedItem) => {
+    try {
+      setFeeds(currentFeeds => 
+        currentFeeds.map(feed => 
+          feed.id === processedEmail.id 
+            ? { ...feed, processed: true } 
+            : feed
+        )
+      );
+    } catch (error) {
+      console.error('标记邮件为已读失败:', error);
+    }
+  }, []);
 
   const filteredFeeds = (activeTab === 'unprocessed' ? unprocessedFeeds : processedFeeds).filter(feed => {
     return filter === 'all' || feed.site === filter;
@@ -78,6 +82,23 @@ export default function DashboardPage() {
   // 计算未处理和已处理的数量
   const unprocessedCount = filteredFeeds.filter(feed => !feed.processed).length;
   const processedCount = filteredFeeds.filter(feed => feed.processed).length;
+
+  const handleEmailClick = (email: FeedItem) => {
+    setSelectedEmail(email);
+    setIsPreviewOpen(true);
+  };
+
+  const handleClosePreview = () => {
+    console.log('handleClosePreview');
+    setIsPreviewOpen(false);
+    setSelectedEmail(null);
+  };
+
+  useEffect(() => {
+    if (isPreviewOpen) {
+      // 处理邮件预览的逻辑
+    }
+  }, [isPreviewOpen]); // 仅在 isPreviewOpen 变化时执行
 
   return (
     <div className={styles.dashboard}>
@@ -157,7 +178,7 @@ export default function DashboardPage() {
                   href={item.link}
                   target={item.site === 'GitHub' ? '_blank' : undefined}
                   rel={item.site === 'GitHub' ? 'noopener noreferrer' : undefined}
-                  onClick={item.site === 'Email' ? () => setSelectedEmail(item) : undefined}
+                  onClick={item.site === 'Email' ? () => handleEmailClick(item) : undefined}
                 >
                   <div className={styles.feedHeader}>
                     <img 
@@ -177,10 +198,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {selectedEmail && (
+      {isPreviewOpen && selectedEmail && (
         <EmailPreview 
           email={selectedEmail} 
-          onClose={() => setSelectedEmail(null)}
+          onClose={handleClosePreview}
           onProcessed={handleEmailProcessed}
         />
       )}
